@@ -14,7 +14,7 @@ load_dotenv()
 class PDFProcessorSimple:
     def __init__(self, qdrant_url: str = None, collection_name: str = None):
         # Get Qdrant URL from environment or use default
-        self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL", "https://your-qdrant-host.com")
+        self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL", "https://815b76de-079e-4147-b21a-147bb5198e47.europe-west3-0.gcp.cloud.qdrant.io")
         self.collection_name = collection_name or os.getenv("VECTOR_NAME", "documents")
         self.model_name = "BAAI/bge-small-en-v1.5"
         
