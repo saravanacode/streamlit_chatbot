@@ -13,3 +13,4 @@ requests
 sentence_transformers
 langgraph
 langchain-openai
+qdrant-client
