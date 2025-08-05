@@ -14,3 +14,4 @@ sentence_transformers
 langgraph
 langchain-openai
 qdrant-client
+pypdf
