@@ -12,17 +12,31 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class PDFProcessorSimple:
-    def __init__(self, qdrant_url: str = "http://localhost:6333", collection_name: str = "documents"):
-        self.qdrant_url = qdrant_url
-        self.collection_name = os.getenv("VECTOR_NAME")
+    def __init__(self, qdrant_url: str = None, collection_name: str = None):
+        # Get Qdrant URL from environment or use default
+        self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL", "https://your-qdrant-host.com")
+        self.collection_name = collection_name or os.getenv("VECTOR_NAME", "documents")
         self.model_name = "BAAI/bge-small-en-v1.5"
         
         print(f"Loading model: {self.model_name}")
         self.sentence_transformer = SentenceTransformer(self.model_name)
         print("✅ Model loaded")
         
-        print("Connecting to Qdrant...")
-        self.qdrant_client = QdrantClient(url=qdrant_url)
+        print(f"Connecting to Qdrant at: {self.qdrant_url}")
+        
+        # Get API key for hosted Qdrant
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        
+        if qdrant_api_key:
+            # Connect to hosted Qdrant with API key
+            self.qdrant_client = QdrantClient(
+                url=self.qdrant_url,
+                api_key=qdrant_api_key
+            )
+        else:
+            # Connect without API key (for self-hosted or public instances)
+            self.qdrant_client = QdrantClient(url=self.qdrant_url)
+        
         print("✅ Qdrant connected")
         
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -149,10 +163,8 @@ class PDFProcessorSimple:
             #             )
             #         ]
             #     )
+            
             print(f"Searching for query: {query} in collection: {self.collection_name}")
-            print(f"Query embedding: {query_embedding}")
-            print(f"Search filter: {search_filter}")
-            k = 10
             search_results = self.qdrant_client.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
@@ -169,13 +181,53 @@ class PDFProcessorSimple:
                     "score": result.score,
                     "id": result.id
                 })
-            print(f"✅ Formatted {len(formatted_results)} results")
-        
+            
             return formatted_results
             
         except Exception as e:
             print(f"❌ Error searching: {str(e)}")
             return []
+    
+    def delete_document(self, document_id: str) -> bool:
+        """Delete all chunks of a document from Qdrant"""
+        try:
+            # Delete points with matching document_id
+            self.qdrant_client.delete(
+                collection_name=self.collection_name,
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="document_id",
+                                match=models.MatchValue(value=document_id)
+                            )
+                        ]
+                    )
+                )
+            )
+            return True
+            
+        except Exception as e:
+            print(f"Error deleting document {document_id}: {str(e)}")
+            return False
+    
+    def get_collection_info(self) -> dict:
+        """Get information about the Qdrant collection"""
+        try:
+            info = self.qdrant_client.get_collection(self.collection_name)
+            return {
+                "vectors_count": info.vectors_count,
+                "indexed_vectors_count": info.indexed_vectors_count,
+                "points_count": info.points_count,
+                "segments_count": info.segments_count,
+                "status": info.status,
+                "embedding_model": self.model_name,
+                "collection_name": self.collection_name,
+                "qdrant_url": self.qdrant_url
+            }
+        except Exception as e:
+            print(f"Error getting collection info: {str(e)}")
+            return {}
 
 # Test function
 def test_processing():
@@ -191,7 +243,7 @@ def test_processing():
         
         # Test search
         results = processor.search_documents("ball tracking", user_id="user123", k=3)
-        print(f"�� Found {len(results)} search results")
+        print(f" Found {len(results)} search results")
         
         for i, result in enumerate(results):
             print(f"Result {i+1}: {result['content'][:100]}...")

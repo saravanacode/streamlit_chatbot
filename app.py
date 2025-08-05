@@ -8,6 +8,13 @@ import uuid
 
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 
+def get_secret(key):
+    """Get secret from Streamlit secrets or environment"""
+    try:
+        return st.secrets[key]
+    except:
+        return os.getenv(key)
+
 def initialize_session_state():
     if 'chatbot_started' not in st.session_state:
         st.session_state.chatbot_started = False
@@ -17,7 +24,14 @@ def initialize_session_state():
         st.session_state.uploaded_documents = []
     if 'pdf_processor' not in st.session_state:
         try:
-            st.session_state.pdf_processor = PDFProcessorSimple()
+            # Get Qdrant configuration from environment/secrets
+            qdrant_url = get_secret("QDRANT_URL")
+            collection_name = get_secret("VECTOR_NAME")
+            
+            st.session_state.pdf_processor = PDFProcessorSimple(
+                qdrant_url=qdrant_url,
+                collection_name=collection_name
+            )
         except Exception as e:
             st.error(f"Could not initialize PDF processor: {str(e)}")
             st.session_state.pdf_processor = None
@@ -104,7 +118,6 @@ def get_chatbot_response(user_message):
                 conversation_history.append({"sender": "system", "message": msg["content"]})
         
         # Get response from chat agent
-        print(f"Conversation history: {conversation_history}")
         response = stream_graph_updates(user_message, conversation_history)
         return response
     except Exception as e:
@@ -130,12 +143,14 @@ def main():
                         st.write(f"**Points:** {collection_info.get('points_count', 0)}")
                         st.write(f"**Status:** {collection_info.get('status', 'Unknown')}")
                         st.write(f"**Model:** BGE-Small-EN-v1.5")
+                        st.write(f"**Collection:** {collection_info.get('collection_name', 'Unknown')}")
+                        st.write(f"**Qdrant URL:** {collection_info.get('qdrant_url', 'Unknown')}")
                     else:
                         st.write("No collection info available")
                 else:
                     st.write("PDF processor not available")
-            except:
-                st.write("Qdrant connection not available")
+            except Exception as e:
+                st.write(f"Error getting collection info: {str(e)}")
         
         # File uploader
         uploaded_file = st.file_uploader(

@@ -12,3 +12,4 @@ python-dotenv
 requests
 sentence_transformers
 langgraph
+langchain-openai
